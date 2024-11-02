@@ -1,257 +1,250 @@
 ﻿using LimLauncher.Entities;
 using LimLauncher.Modules;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Controls.Primitives;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
-namespace LimLauncher
+namespace LimLauncher;
+
+/// <summary>
+/// MainWindow.xaml 的交互逻辑
+/// </summary>
+public partial class MainWindow
 {
-    /// <summary>
-    /// MainWindow.xaml 的交互逻辑
-    /// </summary>
-    public partial class MainWindow
+    private readonly ILogger<MainWindow> _logger;
+    private string JsonFile => System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "filelist.json");
+    public ObservableCollection<GroupInfo> Groups { get; set; } = new ObservableCollection<GroupInfo>();
+    private string OldCellValue;
+    private LauncherSettings _launcherSettings;
+
+    public bool MinInTaskbar { get; set; } = true;
+    private void LoadInfos()
     {
-        private string JsonFile => System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "filelist.json");
-        public ObservableCollection<GroupInfo> Groups { get; set; } = new ObservableCollection<GroupInfo>();
-        private string OldCellValue;
-
-        public bool MinInTaskbar { get; set; } = true;
-        private void LoadInfos()
+        var groups = SqliteHelper.Instance.ExecuteQuery<GroupInfo>("Select * from GroupInfo");
+        foreach (var Group in groups)
         {
-            var groups = SqliteHelper.Instance.ExecuteQuery<GroupInfo>("Select * from GroupInfo");
-            foreach (var Group in groups)
-            {
-                Group.LoadShortcuts();
-                Groups.Add(Group);
-            }
+            Group.LoadShortcuts();
+            Groups.Add(Group);
         }
+    }
 
-        public MainWindow()
+    public MainWindow(ILogger<MainWindow> logger, IOptions<LauncherSettings> launcherSettingsOptions)
+    {
+        _logger = logger;
+        _launcherSettings = launcherSettingsOptions.Value;
+        InitializeComponent();
+        if (System.IO.File.Exists(JsonFile))
         {
-            InitializeComponent();
-            if (System.IO.File.Exists(JsonFile))
-            {
-                var groups = Newtonsoft.Json.JsonConvert.DeserializeObject<ObservableCollection<GroupInfo>>(System.IO.File.ReadAllText(JsonFile));
+            var groups = Newtonsoft.Json.JsonConvert.DeserializeObject<ObservableCollection<GroupInfo>>(System.IO.File.ReadAllText(JsonFile));
 
-                foreach (var GroupInfo in groups)
+            foreach (var GroupInfo in groups)
+            {
+                string GroupID = Guid.NewGuid().ToString();
+                GroupInfo.ID = GroupID;
+                GroupInfo.AddNewGroupToDB();
+
+                foreach (var ShortcutInfo in GroupInfo.ListShortcutInfo)
                 {
-                    string GroupID = Guid.NewGuid().ToString();
-                    GroupInfo.ID = GroupID;
-                    GroupInfo.AddNewGroupToDB();
-
-                    foreach (var ShortcutInfo in GroupInfo.ListShortcutInfo)
-                    {
-                        ShortcutInfo.GroupID = GroupID;
-                        ShortcutInfo.ID = Guid.NewGuid().ToString();
-                        ShortcutInfo.AddNewShortcutToDB();
-                    }
+                    ShortcutInfo.GroupID = GroupID;
+                    ShortcutInfo.ID = Guid.NewGuid().ToString();
+                    ShortcutInfo.AddNewShortcutToDB();
                 }
-                System.IO.File.Delete(JsonFile);
             }
-
-            LoadInfos();
-
-            if (Groups.Count == 0)
-            {
-                Groups = new ObservableCollection<GroupInfo>();
-                AddNewGroup("默认分组");
-            }
-            this.Height = Properties.Settings.Default.LastHeight;
-            this.Width = Properties.Settings.Default.LastWidth;
-            this.Top = Properties.Settings.Default.LastTop;
-            this.Left = Properties.Settings.Default.LastLeft;
-            this.Topmost = Properties.Settings.Default.TopMost;
-            this.MinInTaskbar = Properties.Settings.Default.MinInTaskBar;
-            tog_Topmost.IsChecked = Properties.Settings.Default.TopMost;
-
-
-            this.DataContext = this;
+            System.IO.File.Delete(JsonFile);
         }
 
-        #region 事件
-        /// <summary>
-        /// 窗体加载
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void MetroWindow_Loaded(object sender, RoutedEventArgs e)
+        LoadInfos();
+
+        if (Groups.Count == 0)
         {
-            if (Groups.Count > 0)
-            {
-                dg_Groups.SelectedIndex = 0;
-            }
-            MessageBoxHelper.GlobalParentWindow = this;
+            Groups = new ObservableCollection<GroupInfo>();
+            AddNewGroup("默认分组");
         }
+        this.Height = _launcherSettings.LastHeight;
+        this.Width = _launcherSettings.LastWidth;
+        this.Top = _launcherSettings.LastTop;
+        this.Left = _launcherSettings.LastLeft;
+        this.Topmost = _launcherSettings.TopMost;
+        this.MinInTaskbar = _launcherSettings.MinInTaskBar;
+        tog_Topmost.IsChecked = _launcherSettings.TopMost;
 
-        /// <summary>
-        /// 添加分组
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void BtnAddGroup_Click(object sender, RoutedEventArgs e)
+
+        this.DataContext = this;
+    }
+
+    #region 事件
+    /// <summary>
+    /// 窗体加载
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void MetroWindow_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (Groups.Count > 0)
         {
-            AddNewGroup();
+            dg_Groups.SelectedIndex = 0;
         }
+        MessageBoxHelper.GlobalParentWindow = this;
+    }
+
+    /// <summary>
+    /// 添加分组
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void BtnAddGroup_Click(object sender, RoutedEventArgs e)
+    {
+        AddNewGroup();
+    }
 
 
-        /// <summary>
-        /// 滚轮穿透
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void ScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    /// <summary>
+    /// 滚轮穿透
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void ScrollViewer_PreviewMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        scv.ScrollToVerticalOffset(scv.VerticalOffset - e.Delta);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// 分组名编辑完成
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void DataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    {
+        if (string.IsNullOrEmpty(((TextBox)e.EditingElement).Text))
         {
-            scv.ScrollToVerticalOffset(scv.VerticalOffset - e.Delta);
+            ((TextBox)e.EditingElement).Text = OldCellValue;
+        }
+    }
+
+    /// <summary>
+    /// 更改选中分组
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void DataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (e.AddedItems.Count > 0)
+        {
+            FileView.SetFileList((GroupInfo)e.AddedItems[0]);
+        }
+    }
+
+    /// <summary>
+    /// 分组名预存
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void DataGrid_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
+    {
+        OldCellValue = ((TextBox)e.EditingElement).Text;
+    }
+
+    private void MetroWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+    {
+        MyNotifyIcon.Dispose();
+        SaveSettings();
+    }
+
+
+    /// <summary>
+    /// 分组名删除快捷键
+    /// </summary>
+    /// <param name="sender"></param>
+    /// <param name="e"></param>
+    private void DataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+    {
+
+        if (e.Key == Key.Delete && ((DataGrid)sender).SelectedItem != null && !((DataGrid)sender).IsEditing())
+        {
             e.Handled = true;
         }
+    }
 
-        /// <summary>
-        /// 分组名编辑完成
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void DataGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
+    private void MIDel_Click(object sender, RoutedEventArgs e)
+    {
+        if (MessageBoxHelper.ShowYesNoMessage("确定要永久性的删除此分组吗？", "删除确认") == ModernMessageBoxLib.ModernMessageboxResult.Button1)
         {
-            if (string.IsNullOrEmpty(((TextBox)e.EditingElement).Text))
-            {
-                ((TextBox)e.EditingElement).Text = OldCellValue;
-            }
+            var group = ((MenuItem)sender).DataContext as GroupInfo;
+            group.RemoveGroupFromDB();
+            Groups.Remove(group);
+            if (Groups.Count == 0) FileView.SetFileList(AddNewGroup("默认分组"));
         }
 
-        /// <summary>
-        /// 更改选中分组
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void DataGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    }
+    #endregion
+
+    #region 方法
+
+    /// <summary>
+    /// 添加分组
+    /// </summary>
+    /// <param name="defualtGroupName"></param>
+    /// <returns></returns>
+    private GroupInfo AddNewGroup(string defualtGroupName = "新分组")
+    {
+        GroupInfo GroupNew = new GroupInfo() { GroupName = defualtGroupName };
+
+        GroupNew.AddNewGroupToDB();
+        Groups.Add(GroupNew);
+        dg_Groups.SelectedIndex = dg_Groups.Items.Count - 1;
+        scv.ScrollToEnd();
+        return GroupNew;
+    }
+
+    /// <summary>
+    /// 保存分组
+    /// </summary>
+    //private void Save()
+    //{
+    //    string strJson = Newtonsoft.Json.JsonConvert.SerializeObject(Groups);
+    //    System.IO.File.WriteAllText(JsonFile, strJson);
+    //}
+
+    /// <summary>
+    /// 保存配置
+    /// </summary>
+    private void SaveSettings()
+    {
+        Properties.Settings.Default.LastHeight = this.Height;
+        Properties.Settings.Default.LastWidth = this.Width;
+        Properties.Settings.Default.TopMost = this.Topmost;
+        Properties.Settings.Default.LastTop = this.Top;
+        Properties.Settings.Default.LastLeft = this.Left;
+        Properties.Settings.Default.TopMost = this.Topmost;
+        Properties.Settings.Default.MinInTaskBar = this.MinInTaskbar;
+        Properties.Settings.Default.Save();
+    }
+
+    #endregion
+
+    private void MenuItem_Click(object sender, RoutedEventArgs e)
+    {
+        (((FrameworkElement)sender).DataContext as ShortcutInfo).StartFile();
+    }
+
+    private void MyNotifyIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
+    {
+        if (this.WindowState == WindowState.Minimized)
         {
-            if (e.AddedItems.Count > 0)
-            {
-                FileView.SetFileList((GroupInfo)e.AddedItems[0]);
-            }
+            this.WindowState = WindowState.Normal;
         }
-
-        /// <summary>
-        /// 分组名预存
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void DataGrid_PreparingCellForEdit(object sender, DataGridPreparingCellForEditEventArgs e)
+        else
         {
-            OldCellValue = ((TextBox)e.EditingElement).Text;
+            this.Activate();
         }
+    }
 
-        private void MetroWindow_Closing(object sender, System.ComponentModel.CancelEventArgs e)
-        {
-            MyNotifyIcon.Dispose();
-            SaveSettings();
-        }
-
-
-        /// <summary>
-        /// 分组名删除快捷键
-        /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        private void DataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-
-            if (e.Key == Key.Delete && ((DataGrid)sender).SelectedItem != null && !((DataGrid)sender).IsEditing())
-            {
-                e.Handled = true;
-            }
-        }
-
-        private void MIDel_Click(object sender, RoutedEventArgs e)
-        {
-            if (MessageBoxHelper.ShowYesNoMessage("确定要永久性的删除此分组吗？", "删除确认") == ModernMessageBoxLib.ModernMessageboxResult.Button1)
-            {
-                var group = ((MenuItem)sender).DataContext as GroupInfo;
-                group.RemoveGroupFromDB();
-                Groups.Remove(group);
-                if (Groups.Count == 0) FileView.SetFileList(AddNewGroup("默认分组"));
-            }
-
-        }
-        #endregion
-
-        #region 方法
-
-        /// <summary>
-        /// 添加分组
-        /// </summary>
-        /// <param name="defualtGroupName"></param>
-        /// <returns></returns>
-        private GroupInfo AddNewGroup(string defualtGroupName = "新分组")
-        {
-            GroupInfo GroupNew = new GroupInfo() { GroupName = defualtGroupName };
-
-            GroupNew.AddNewGroupToDB();
-            Groups.Add(GroupNew);
-            dg_Groups.SelectedIndex = dg_Groups.Items.Count - 1;
-            scv.ScrollToEnd();
-            return GroupNew;
-        }
-
-        /// <summary>
-        /// 保存分组
-        /// </summary>
-        //private void Save()
-        //{
-        //    string strJson = Newtonsoft.Json.JsonConvert.SerializeObject(Groups);
-        //    System.IO.File.WriteAllText(JsonFile, strJson);
-        //}
-
-        /// <summary>
-        /// 保存配置
-        /// </summary>
-        private void SaveSettings()
-        {
-            Properties.Settings.Default.LastHeight = this.Height;
-            Properties.Settings.Default.LastWidth = this.Width;
-            Properties.Settings.Default.TopMost = this.Topmost;
-            Properties.Settings.Default.LastTop = this.Top;
-            Properties.Settings.Default.LastLeft = this.Left;
-            Properties.Settings.Default.TopMost = this.Topmost;
-            Properties.Settings.Default.MinInTaskBar = this.MinInTaskbar;
-            Properties.Settings.Default.Save();
-        }
-
-        #endregion
-
-        private void MenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            (((FrameworkElement)sender).DataContext as ShortcutInfo).StartFile();
-        }
-
-        private void MyNotifyIcon_TrayMouseDoubleClick(object sender, RoutedEventArgs e)
-        {
-            if (this.WindowState == WindowState.Minimized)
-            {
-                this.WindowState = WindowState.Normal;
-            }
-            else
-            {
-                this.Activate();
-            }
-        }
-
-        private void MetroWindow_StateChanged(object sender, EventArgs e)
-        {
-            this.ShowInTaskbar = this.WindowState != WindowState.Minimized || MinInTaskbar;
-        }
+    private void MetroWindow_StateChanged(object sender, EventArgs e)
+    {
+        this.ShowInTaskbar = this.WindowState != WindowState.Minimized || MinInTaskbar;
     }
 }

@@ -5,7 +5,7 @@
     xmlns:controls="http://metro.mahapps.com/winfx/xaml/controls"
     xmlns:local="clr-namespace:LimLauncher"
     xmlns:wpf="http://materialdesigninxaml.net/winfx/xaml/themes"
-    StartupUri="MainWindow.xaml">
+    >
     <Application.Resources>
         <ResourceDictionary>
 

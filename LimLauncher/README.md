@@ -1,2 +1,3 @@
-﻿## 2021-06-10
-- Upgrade csproj format
+﻿# README
+
+- A rolan-like launcher
