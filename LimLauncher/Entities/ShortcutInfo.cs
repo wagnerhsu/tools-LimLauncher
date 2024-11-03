@@ -49,7 +49,7 @@ public class ShortcutInfo
     /// <param name="FileName"></param>
     public void StartFile()
     {
-        new System.Threading.Thread(() =>
+        new Thread(() =>
         {
             try
             {

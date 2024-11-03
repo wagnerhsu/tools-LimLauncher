@@ -19,9 +19,9 @@ public static class IconManager
     /// <returns>null if path is null, otherwise - an icon</returns>
     public static ImageSource FindIconForFilename(string fileName, bool large)
     {
-        if (System.IO.Directory.Exists(fileName))
+        if (Directory.Exists(fileName))
         {
-            fileName = System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Explorer.exe");
+            fileName = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Explorer.exe");
         }
         var extension = Path.GetExtension(fileName);
         if (extension == null)

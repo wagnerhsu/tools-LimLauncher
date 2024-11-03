@@ -187,9 +187,9 @@ public partial class FileListView : UserControl
     {
         try
         {
-            foreach (ShortcutInfo File in lbFiles.SelectedItems)
+            foreach (ShortcutInfo file in lbFiles.SelectedItems)
             {
-                File.StartFile();
+                file.StartFile();
             }
         }
         catch (Exception ex)
@@ -244,11 +244,11 @@ public partial class FileListView : UserControl
     {
         try
         {
-            foreach (ShortcutInfo File in lbFiles.SelectedItems)
+            foreach (ShortcutInfo file in lbFiles.SelectedItems)
             {
                 Process p = new Process();
                 p.StartInfo.FileName = "Explorer.exe";
-                p.StartInfo.Arguments = "/select," + File.FileFullPath;
+                p.StartInfo.Arguments = "/select," + file.FileFullPath;
                 p.Start();
             }
         }
@@ -260,7 +260,7 @@ public partial class FileListView : UserControl
 
     private void MIAdminRun_Click(object sender, RoutedEventArgs e)
     {
-        foreach (ShortcutInfo File in lbFiles.SelectedItems)
+        foreach (ShortcutInfo file in lbFiles.SelectedItems)
         {
             ProcessStartInfo startInfo = new ProcessStartInfo
             {
@@ -268,11 +268,11 @@ public partial class FileListView : UserControl
                 WorkingDirectory = Environment.CurrentDirectory,
                 Verb = "runas",
                 //设置启动动作,确保以管理员身份运行
-                FileName = File.FileFullPath
+                FileName = file.FileFullPath
             };
             try
             {
-                System.Diagnostics.Process.Start(startInfo);
+                Process.Start(startInfo);
             }
             catch
             {
